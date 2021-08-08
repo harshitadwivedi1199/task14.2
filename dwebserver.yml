@@ -1,0 +1,84 @@
+- hosts: webserver  
+  tasks:
+  - name: Installing packages
+    package: 
+        name: "docker"  
+  - package:
+        name: pip
+        state: present 
+  - pip:
+        name: "docker-py"
+        state: present
+  - name: Starting docker services       
+    service:
+        name: "docker"
+        state: started
+        enabled: yes
+  - name: Downloading httpd image 
+    docker_image:
+        name: "httpd"
+        source: pull
+  - name: Installing httpd service
+    package:
+        name: httpd
+        state: present
+  - name: Starting httpd service
+    service:
+        name: httpd
+        state: started
+  - name: Copying webpage and image       
+    copy:
+        src: "/root/ansiblews/task14.2/myweb.html"
+        dest: "/var/www/html/myweb.html"      
+  - copy:
+        src: "/root/ansiblews/task14.2/happy.jpg"
+        dest: "/var/www/html/"     
+  - name: Launching Container 
+    docker_container:
+        name: "webserver"      
+        image: "httpd"
+        state: started
+        container_default_behavior: compatibility
+        interactive: yes
+        tty: yes 
+        ports: 8080:80
+        volumes: "/var/www/html/:/usr/local/apache2/htdocs/"
+#  - debug:
+#        msg: "{{ansible_facts}}"
+  - docker_container_info:
+        name: "webserver"
+    register: docker_info
+  - debug:
+        msg: "{{docker_info.container.NetworkSettings.IPAddress}}"
+    register: ip      
+  - set_fact: 
+        shared_variable: "{{ ip }}"
+  - add_host:
+        name: harc
+        shared_variable: "{{ shared_variable }}"
+
+- hosts: localhost
+  vars:
+          ip: "{{ hostvars['harc']['shared_variable'] }}"
+  tasks:        
+#  - lineinfile:
+#          path: "inventory.txt"
+#          regex: "docker_ip"
+#          line: "[docker_ip] \n {{ip.msg}}"
+  - name: Updating inventory with container ip
+    blockinfile:
+       path: /root/ansiblews/task14.2/inventory.txt
+       marker: "# 2nd {mark} ANSIBLE MANAGED BLOCK "
+       block: |
+               [docker]
+               {{ ip.msg }}
+
+                 
+
+
+
+
+
+
+
+            
